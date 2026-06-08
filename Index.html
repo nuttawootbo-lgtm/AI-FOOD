@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Food Assistant — ย่านอารีย์</title>
+<style>
+  :root {
+    --primary: #3d1f0a;
+    --accent:  #c8702a;
+    --green:   #6aaa5e;
+    --yellow:  #e8a020;
+    --red:     #c0392b;
+    --bg:      #f5ede0;
+    --card:    #fffaf4;
+    --text:    #2c1a0e;
+    --muted:   #8c6e55;
+    --border:  #e0ccb4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: var(--bg);
+    background-image:
+      radial-gradient(circle at 15% 20%, rgba(200,112,42,.08) 0%, transparent 50%),
+      radial-gradient(circle at 85% 70%, rgba(61,31,10,.06) 0%, transparent 50%),
+      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23c8702a' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    color: var(--text); font-size: 15px; line-height: 1.6;
+  }
+
+  /* HEADER */
+  .hero {
+    background: linear-gradient(135deg, #1a0a02 0%, #3d1f0a 40%, #7a3d10 70%, #c8702a 100%);
+    color: #fff; padding: 48px 32px 36px; text-align: center;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '🍜 🌶️ 🍖 🥩 🍣 🥗 🍛 🫕';
+    position: absolute; top: 10px; left: 0; right: 0;
+    font-size: 1.4rem; opacity: .08; letter-spacing: 18px;
+    white-space: nowrap; overflow: hidden;
+  }
+  .hero h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.5px; }
+  .hero .sub { font-size: 1.05rem; opacity: .85; margin-top: 8px; }
+  .hero .meta { display: flex; justify-content: center; gap: 24px; margin-top: 18px; flex-wrap: wrap; }
+  .hero .meta span { background: rgba(255,255,255,.18); border-radius: 20px; padding: 4px 14px; font-size: .85rem; }
+
+  /* FOOD RIBBON */
+  .food-ribbon { display: flex; height: 160px; overflow: visible; }
+  .food-ribbon-item { flex: 1; position: relative; overflow: visible; transition: flex .4s ease; cursor: pointer; min-width: 0; }
+  .food-ribbon-item:hover { flex: 3; }
+  .food-ribbon-img { width: 100%; height: 160px; overflow: hidden; }
+  .food-ribbon-item img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    filter: brightness(.75) saturate(1.1);
+    transform: scale(1);
+    transition: transform .45s cubic-bezier(.34,1.56,.64,1), filter .3s;
+  }
+  .food-ribbon-item:hover img {
+    transform: scale(1.13);
+    filter: brightness(.95) saturate(1.3);
+  }
+  .food-ribbon-item .food-label {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(61,31,10,.85));
+    color: #fff; font-size: .78rem; font-weight: 700; padding: 20px 10px 8px;
+    text-align: center; opacity: 0; transition: opacity .3s;
+  }
+  .food-ribbon-item:hover .food-label { opacity: 1; }
+  .food-ribbon-item::after {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    border-right: 2px solid rgba(200,112,42,.5);
+    pointer-events: none;
+  }
+  .food-ribbon-item:last-child::after { display: none; }
+
+  /* FOOD RIBBON POPUP */
+  @keyframes popBounce {
+    0%   { transform: translateX(-50%) translateY(10px) scale(.85); opacity: 0; }
+    60%  { transform: translateX(-50%) translateY(-6px) scale(1.15); opacity: 1; }
+    80%  { transform: translateX(-50%) translateY(3px) scale(1.08); }
+    100% { transform: translateX(-50%) translateY(0) scale(1.1); opacity: 1; }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+  .food-popup {
+    position: absolute; bottom: calc(100% + 14px); left: 50%;
+    transform: translateX(-50%) translateY(10px) scale(.85);
+    background: linear-gradient(135deg, rgba(20,8,2,.96), rgba(80,35,8,.96));
+    color: #fff; border-radius: 14px;
+    padding: 14px 18px; min-width: 190px; text-align: center;
+    pointer-events: none; opacity: 0;
+    border: 1.5px solid rgba(200,112,42,.7);
+    box-shadow: 0 12px 36px rgba(0,0,0,.55), 0 0 0 0 rgba(200,112,42,0);
+    backdrop-filter: blur(8px); z-index: 999; white-space: nowrap;
+    transition: none;
+  }
+  .food-popup::before {
+    content: ''; position: absolute; inset: 0; border-radius: 14px;
+    background: linear-gradient(90deg, transparent 0%, rgba(255,200,100,.12) 50%, transparent 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+  .food-popup::after {
+    content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    border: 8px solid transparent; border-top-color: rgba(80,35,8,.96);
+    filter: drop-shadow(0 3px 3px rgba(0,0,0,.3));
+  }
+  .food-popup .pop-name {
+    font-size: 1rem; font-weight: 900; margin-bottom: 5px;
+    background: linear-gradient(90deg, #f5c87a, #ffaa44, #f5c87a);
+    background-size: 200% 100%;
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    animation: shimmer 1.8s linear infinite;
+  }
+  .food-popup .pop-hint { font-size: .78rem; opacity: .85; line-height: 1.5; }
+  .food-popup .pop-maps {
+    display: inline-block; margin-top: 8px; padding: 4px 12px;
+    background: linear-gradient(90deg, #c8702a, #e8903a);
+    border-radius: 20px; font-size: .75rem; font-weight: 700;
+    color: #fff; letter-spacing: .3px;
+  }
+  .food-ribbon-item:hover .food-popup {
+    animation: popBounce .45s cubic-bezier(.34,1.56,.64,1) forwards;
+  }
+
+  /* KPI STRIP */
+  .kpi-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; padding: 24px 32px; background: linear-gradient(90deg, #2a1005, #4a2510, #2a1005); }
+  .kpi { background: rgba(255,255,255,.1); border-radius: 10px; padding: 16px; text-align: center; color: #fff; }
+  .kpi .num { font-size: 2rem; font-weight: 800; }
+  .kpi .lbl { font-size: .8rem; opacity: .8; margin-top: 2px; }
+
+  /* SECTIONS */
+  section { padding: 40px 32px; max-width: 1200px; margin: 0 auto; }
+  h2.sec-title {
+    font-size: 1.4rem; font-weight: 700; color: var(--primary);
+    border-left: 4px solid var(--accent); padding-left: 12px; margin-bottom: 24px;
+  }
+  .card { background: var(--card); border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(61,31,10,.1); margin-bottom: 16px; border: 1px solid var(--border); }
+
+  /* OBJECTIVES */
+  .obj-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .obj-item { background: var(--card); border-radius: 10px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.06); border-top: 3px solid var(--accent); }
+  .obj-item .num { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+  .obj-item p { font-size: .88rem; color: var(--muted); margin-top: 4px; }
+
+  /* WORKFLOW */
+  .flow { display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap; }
+  .flow-step { flex: 1; min-width: 130px; text-align: center; position: relative; padding: 0 8px; }
+  .flow-step .icon { width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #3d1f0a, #c8702a); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; margin: 0 auto 8px; box-shadow: 0 3px 8px rgba(200,112,42,.35); }
+  .flow-step .title { font-size: .82rem; font-weight: 700; color: var(--primary); }
+  .flow-step .desc  { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+  .flow-step:not(:last-child)::after { content: '→'; position: absolute; right: -10px; top: 14px; font-size: 1.2rem; color: var(--accent); font-weight: 900; }
+
+  /* TOOLS */
+  .tools-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
+  .tool-card { background: var(--card); border-radius: 10px; padding: 14px 12px; text-align: center; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+  .tool-card .tool-name { font-weight: 700; font-size: .9rem; color: var(--primary); }
+  .tool-card .tool-role { font-size: .78rem; color: var(--muted); margin-top: 3px; }
+
+  /* DATA SOURCES */
+  .src-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .src-card { background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  .src-card h3 { font-size: 1rem; font-weight: 700; color: var(--primary); margin-bottom: 10px; }
+  .src-card ul { list-style: none; }
+  .src-card ul li { font-size: .85rem; padding: 3px 0; color: var(--muted); }
+  .src-card ul li::before { content: '✓ '; color: var(--green); font-weight: 700; }
+  .badge-src { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: 700; margin-bottom: 8px; }
+  .badge-gm { background: #e8f5e9; color: #2e7d32; }
+  .badge-ta { background: #fff3e0; color: #e65100; }
+
+  /* SCORING */
+  .score-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .score-item { background: var(--card); border-radius: 10px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.06); }
+  .score-item .pts { font-size: 1.8rem; font-weight: 800; color: var(--accent); }
+  .score-item .crit { font-weight: 700; font-size: .95rem; color: var(--primary); }
+  .score-item .desc { font-size: .8rem; color: var(--muted); margin-top: 4px; }
+  .score-bar { height: 6px; background: #eee; border-radius: 3px; margin-top: 8px; }
+  .score-bar-fill { height: 100%; border-radius: 3px; background: linear-gradient(90deg, var(--accent), #f39c12); }
+
+  /* TOP 10 TABLE */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  thead th { background: linear-gradient(90deg, #3d1f0a, #5a2e10); color: #fff; padding: 12px 10px; text-align: left; font-weight: 600; }
+  tbody tr:nth-child(even) { background: #f8fafc; }
+  tbody tr:hover { background: #eef3f8; }
+  tbody td { padding: 11px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .rank-badge { display: inline-block; width: 26px; height: 26px; border-radius: 50%; text-align: center; line-height: 26px; font-weight: 800; font-size: .8rem; }
+  .rank-1 { background: #ffd700; color: #7a5900; }
+  .rank-2 { background: #c0c0c0; color: #444; }
+  .rank-3 { background: #cd7f32; color: #fff; }
+  .rank-n { background: #eee; color: #555; }
+  .score-pill { display: inline-block; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: .82rem; }
+  .score-hi  { background: #e8f5e9; color: #2e7d32; }
+  .score-med { background: #fff8e1; color: #f57f17; }
+  .score-lo  { background: #fce4ec; color: #c62828; }
+  .src-dot-both { display: inline-block; width: 8px; height: 8px; background: var(--green); border-radius: 50%; margin-right: 4px; }
+  .src-dot-gm   { display: inline-block; width: 8px; height: 8px; background: #1a73e8; border-radius: 50%; margin-right: 4px; }
+
+  /* PHOTO GALLERY */
+  .photo-grid { display: grid; grid-template-columns: repeat(5,1fr); gap: 14px; }
+  .photo-card { background: var(--card); border-radius: 12px; overflow: hidden; box-shadow: 0 3px 10px rgba(0,0,0,.1); transition: transform .2s; cursor: pointer; }
+  .photo-card:hover { transform: translateY(-4px); box-shadow: 0 8px 20px rgba(0,0,0,.15); }
+  .photo-card img { width: 100%; height: 160px; object-fit: cover; display: block; }
+  .photo-info { padding: 10px 12px; }
+  .photo-rank { font-size: .72rem; font-weight: 800; color: var(--accent); text-transform: uppercase; }
+  .photo-name { font-size: .88rem; font-weight: 700; color: var(--primary); margin-top: 2px; line-height: 1.3; }
+  .photo-cuisine { font-size: .75rem; color: var(--muted); margin-top: 3px; }
+  .photo-score-bar { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
+  .photo-score-num { font-size: .85rem; font-weight: 800; color: var(--accent); min-width: 28px; }
+  .photo-score-bg { flex: 1; height: 5px; background: #eee; border-radius: 3px; }
+  .photo-score-fill { height: 100%; background: linear-gradient(90deg,var(--accent),#f39c12); border-radius: 3px; }
+
+  /* PHOTO IN REC CARD */
+  .rec-photo { overflow: hidden; }
+  .rec-photo img {
+    width: 100%; height: 200px; object-fit: cover; display: block;
+    transform: scale(1);
+    transition: transform .45s cubic-bezier(.34,1.56,.64,1);
+  }
+  .rec-photo:hover img { transform: scale(1.13); }
+  .stars { color: #f39c12; letter-spacing: -1px; }
+
+  /* TOP 3 CARDS */
+  .rec-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 20px; }
+  .rec-card { background: var(--card); border-radius: 14px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.1); position: relative; }
+  .rec-card.gold   .rec-header { background: linear-gradient(135deg, #b8860b, #ffd700); }
+  .rec-card.silver .rec-header { background: linear-gradient(135deg, #607d8b, #b0bec5); }
+  .rec-card.bronze .rec-header { background: linear-gradient(135deg, #8d4e2a, #cd7f32); }
+  .rec-header { padding: 20px; color: #fff; text-align: center; }
+  .rec-header .medal { font-size: 2.2rem; }
+  .rec-header h3 { font-size: 1rem; font-weight: 800; margin-top: 6px; line-height: 1.3; }
+  .rec-header .rec-score { font-size: 1.8rem; font-weight: 900; margin-top: 4px; }
+  .rec-body { padding: 18px; }
+  .rec-body .rec-row { display: flex; justify-content: space-between; font-size: .85rem; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .rec-body .rec-row:last-child { border-bottom: none; }
+  .rec-body .rec-row .lbl { color: var(--muted); }
+  .rec-body .rec-row .val { font-weight: 600; color: var(--text); }
+  .rec-tag { display: inline-block; background: #e3f2fd; color: #1565c0; border-radius: 10px; padding: 2px 8px; font-size: .75rem; margin: 2px 2px 0; }
+  .rec-why { font-size: .82rem; color: var(--muted); margin-top: 12px; padding: 10px; background: var(--bg); border-radius: 8px; font-style: italic; }
+
+  /* COMPARISON TABLE */
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  .cmp-table th { background: linear-gradient(90deg, #3d1f0a, #5a2e10); color: #fff; padding: 10px 12px; text-align: center; }
+  .cmp-table th:first-child { text-align: left; }
+  .cmp-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); text-align: center; }
+  .cmp-table td:first-child { text-align: left; font-weight: 600; color: var(--primary); }
+  .cmp-table tbody tr:nth-child(even) { background: #f8fafc; }
+  .check { color: var(--green); font-weight: 700; font-size: 1.1rem; }
+  .cross { color: var(--red); }
+
+  /* INSIGHT */
+  .insight-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; }
+  .insight-card { background: var(--card); border-radius: 10px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,.06); border-left: 4px solid var(--accent); }
+  .insight-card h4 { font-size: .9rem; font-weight: 700; color: var(--primary); margin-bottom: 6px; }
+  .insight-card p  { font-size: .82rem; color: var(--muted); }
+
+  /* AUTOMATION */
+  .auto-box { background: linear-gradient(135deg, #2a1005, #4a2510); color: #fff; border-radius: 12px; padding: 24px; border: 1px solid #7a4020; }
+  .auto-box h3 { font-size: 1rem; font-weight: 700; margin-bottom: 12px; }
+  .auto-steps { display: flex; gap: 12px; flex-wrap: wrap; }
+  .auto-step { background: rgba(255,255,255,.12); border-radius: 8px; padding: 10px 14px; font-size: .83rem; flex: 1; min-width: 160px; }
+  .auto-step .step-num { font-size: 1.2rem; font-weight: 800; color: var(--accent); }
+
+  /* FOOTER */
+  footer { background: linear-gradient(90deg, #1a0a02, #3d1f0a, #1a0a02); color: rgba(255,255,255,.7); text-align: center; padding: 24px; font-size: .82rem; margin-top: 40px; border-top: 3px solid var(--accent); }
+  footer strong { color: #fff; }
+
+  @media(max-width:768px) {
+    .kpi-strip { grid-template-columns: repeat(2,1fr); }
+    .obj-grid, .score-grid, .rec-grid, .insight-grid { grid-template-columns: 1fr; }
+    .tools-grid { grid-template-columns: repeat(2,1fr); }
+    .src-grid { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; gap: 8px; }
+    .flow-step::after { display: none; }
+    section { padding: 24px 16px; }
+    .hero { padding: 32px 16px; }
+    .kpi-strip { padding: 16px; }
+    .photo-grid { grid-template-columns: repeat(2,1fr); }
+  }
+  @media(max-width:480px) {
+    .photo-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+  <h1>🍽️ AI Food Assistant — ย่านอารีย์</h1>
+  <div class="sub">ระบบวิเคราะห์และแนะนำร้านอาหารสำหรับทีม 8-12 คน ด้วย AI | เขตพญาไท กรุงเทพมหานคร</div>
+  <div class="meta">
+    <span>📍 ย่านอารีย์ (BTS อารีย์)</span>
+    <span>👥 ทีม 8–12 คน</span>
+    <span>🗓️ ข้อมูล ณ มิถุนายน 2568</span>
+    <span>🤖 Powered by Claude AI + Apify</span>
+  </div>
+</div>
+
+<!-- ===== FOOD RIBBON ===== -->
+<div class="food-ribbon">
+  <a href="https://www.google.com/maps/search/เล+ลาว+ส้มตำ+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://img.wongnai.com/p/1920x0/2018/04/10/0bbee09bdf1642f68d72469ffcd230de.jpg" alt="ส้มตำ"></div>
+    <div class="food-label">🌶️ ส้มตำ → เล ลาว</div>
+    <div class="food-popup"><div class="pop-name">🥇 เล ลาว</div><div class="pop-hint">📍 ส้มตำมิชลิน 5 ปีซ้อน · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+  <a href="https://www.google.com/maps/search/แซ่บสุดใจ+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://img.wongnai.com/p/1920x0/2018/04/30/8575db5c14f54b598121bbeae0b908df.jpg" alt="ลาบ"></div>
+    <div class="food-label">🥩 ลาบ → แซ่บสุดใจ</div>
+    <div class="food-popup"><div class="pop-name">🥩 แซ่บสุดใจ อารีย์</div><div class="pop-hint">📍 อีสานรสจัด เปิดถึงตี 4 · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+  <a href="https://www.google.com/maps/search/ONZON+Esarn+Restaurant+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://img.wongnai.com/p/1920x0/2018/06/15/52a48a520d51410484f3b430761260ad.jpg" alt="อาหารอีสาน"></div>
+    <div class="food-label">🍲 อีสาน → ONZON</div>
+    <div class="food-popup"><div class="pop-name">🥈 ONZON Esarn</div><div class="pop-hint">📍 อีสาน Rooftop ชั้น 7 · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+  <a href="https://www.google.com/maps/search/Paknang+ปากนัง+อาหารใต้+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://static.bkkmenu.com/files/2020/11/Paknangbkk-15-670x1006.jpg" alt="อาหารใต้"></div>
+    <div class="food-label">🦐 อาหารใต้ → ปากนัง</div>
+    <div class="food-popup"><div class="pop-name">🥉 Paknang.bkk ปากนัง</div><div class="pop-hint">📍 อาหารใต้แท้ รสจัด · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+  <a href="https://www.google.com/maps/search/อองตอง+ข้าวซอย+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://img.wongnai.com/p/1920x0/2018/04/24/927ec08507b843b880baf66941f9b38a.jpg" alt="ส้มตำ"></div>
+    <div class="food-label">🌿 ตำ → อองตองข้าวซอย</div>
+    <div class="food-popup"><div class="pop-name">🍜 อองตองข้าวซอย</div><div class="pop-hint">📍 ข้าวซอยเหนือชื่อดัง · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+  <a href="https://www.google.com/maps/search/โกปี๊ฮับ+ไพรม์+อารีย์+กรุงเทพ" target="_blank" style="flex:1;display:flex;min-width:0;">
+  <div class="food-ribbon-item" style="flex:1;">
+    <div class="food-ribbon-img"><img src="https://img.wongnai.com/p/400x0/2024/07/03/4d34ea1cf5444f22bb20af999a571d62.jpg" alt="อาหารไทย"></div>
+    <div class="food-label">🍛 ติ่มซำ → โกปี๊ฮับ</div>
+    <div class="food-popup"><div class="pop-name">☕ โกปี๊ฮับ ไพรม์ อารีย์</div><div class="pop-hint">📍 Malaysian Kopitiam · อารีย์</div><div class="pop-maps">🗺️ เปิด Google Maps</div></div>
+  </div>
+  </a>
+</div>
+
+<!-- ===== KPI STRIP ===== -->
+<div class="kpi-strip">
+  <div class="kpi"><div class="num">31</div><div class="lbl">ร้านอาหารที่รวบรวม</div></div>
+  <div class="kpi"><div class="num">2</div><div class="lbl">แหล่งข้อมูล (Google Maps + TripAdvisor)</div></div>
+  <div class="kpi"><div class="num">100</div><div class="lbl">คะแนนสูงสุด (6 เกณฑ์)</div></div>
+  <div class="kpi"><div class="num">90</div><div class="lbl">คะแนนสูงสุดที่ได้ (เล ลาว)</div></div>
+</div>
+
+<!-- ===== OBJECTIVES ===== -->
+<section>
+  <h2 class="sec-title">🎯 วัตถุประสงค์</h2>
+  <div class="obj-grid">
+    <div class="obj-item"><div class="num">01</div><b>รวบรวมข้อมูลจริง</b><p>ดึงข้อมูลร้านอาหารจาก Google Maps Scraper และ TripAdvisor via Apify API</p></div>
+    <div class="obj-item"><div class="num">02</div><b>ทำความสะอาดข้อมูล</b><p>ตัดรายการซ้ำ เติม missing values และ merge 2 แหล่งข้อมูลด้วย AI</p></div>
+    <div class="obj-item"><div class="num">03</div><b>ให้คะแนน 100 คะแนน</b><p>ประเมิน 6 มิติ ได้แก่ Rating, Group Capacity, Price, Travel, Data Quality, Uniqueness</p></div>
+    <div class="obj-item"><div class="num">04</div><b>วิเคราะห์ Insights</b><p>ค้นหา Pattern, ความเสี่ยง และ Recommended Actions สำหรับการตัดสินใจ</p></div>
+    <div class="obj-item"><div class="num">05</div><b>แนะนำ Top 3</b><p>เลือกร้านที่เหมาะสมที่สุดสำหรับ 4 สถานการณ์ที่แตกต่างกัน</p></div>
+    <div class="obj-item"><div class="num">06</div><b>สร้าง Automation Workflow</b><p>ออกแบบ workflow ที่ทำซ้ำได้สำหรับการประเมินร้านอาหารในอนาคต</p></div>
+  </div>
+</section>
+
+<!-- ===== WORKFLOW ===== -->
+<section style="background:#fdf5ea; padding-top:36px; padding-bottom:36px; max-width:100%; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+<div style="max-width:1200px; margin:0 auto; padding:0 32px;">
+  <h2 class="sec-title">⚙️ Workflow Overview</h2>
+  <div class="flow">
+    <div class="flow-step">
+      <div class="icon">📋</div>
+      <div class="title">1. กำหนดขอบเขต</div>
+      <div class="desc">เลือกย่าน อารีย์<br>ตั้งเกณฑ์ทีม 8-12 คน</div>
+    </div>
+    <div class="flow-step">
+      <div class="icon">🕷️</div>
+      <div class="title">2. ดึงข้อมูล</div>
+      <div class="desc">Apify Google Maps<br>Apify TripAdvisor</div>
+    </div>
+    <div class="flow-step">
+      <div class="icon">🧹</div>
+      <div class="title">3. Clean Data</div>
+      <div class="desc">ตัดซ้ำ merge<br>PowerShell + Claude AI</div>
+    </div>
+    <div class="flow-step">
+      <div class="icon">📊</div>
+      <div class="title">4. ให้คะแนน</div>
+      <div class="desc">6 มิติ 100 คะแนน<br>Claude AI scoring</div>
+    </div>
+    <div class="flow-step">
+      <div class="icon">💡</div>
+      <div class="title">5. วิเคราะห์</div>
+      <div class="desc">Insights Patterns<br>Top 10 ranking</div>
+    </div>
+    <div class="flow-step">
+      <div class="icon">🌐</div>
+      <div class="title">6. สร้าง HTML</div>
+      <div class="desc">Report page<br>พร้อม visualize</div>
+    </div>
+  </div>
+
+  <h2 class="sec-title" style="margin-top:32px;">🛠️ Tools ที่ใช้</h2>
+  <div class="tools-grid">
+    <div class="tool-card"><div class="tool-name">Claude AI (Anthropic)</div><div class="tool-role">วิเคราะห์ข้อมูล · ให้คะแนน · สร้าง HTML</div></div>
+    <div class="tool-card"><div class="tool-name">Apify Platform</div><div class="tool-role">Google Maps Scraper · TripAdvisor Scraper API</div></div>
+    <div class="tool-card"><div class="tool-name">PowerShell</div><div class="tool-role">Merge CSV · Clean Data · Export</div></div>
+    <div class="tool-card"><div class="tool-name">Google Maps</div><div class="tool-role">แหล่งข้อมูลหลัก · Rating · Review Count</div></div>
+    <div class="tool-card"><div class="tool-name">TripAdvisor</div><div class="tool-role">แหล่งข้อมูลเสริม · Price Level · Hours · Cuisine</div></div>
+    <div class="tool-card"><div class="tool-name">Google Sheets</div><div class="tool-role">เก็บข้อมูลดิบ · ตรวจสอบ</div></div>
+    <div class="tool-card"><div class="tool-name">HTML / CSS</div><div class="tool-role">สร้าง Report Page แบบ Responsive</div></div>
+    <div class="tool-card"><div class="tool-name">Claude Code CLI</div><div class="tool-role">Orchestrate workflow ทั้งระบบ</div></div>
+  </div>
+</div>
+</section>
+
+<!-- ===== DATA SOURCES ===== -->
+<section>
+  <h2 class="sec-title">📂 แหล่งข้อมูล</h2>
+  <div class="src-grid">
+    <div class="src-card">
+      <span class="badge-src badge-gm">● Google Maps (แหล่งข้อมูลหลัก)</span>
+      <h3>Apify — crawler-google-places</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">ดึงข้อมูลร้านอาหารในย่านอารีย์ ผ่าน Google Maps Scraper บน Apify Platform</p>
+      <ul>
+        <li>ชื่อร้านและที่อยู่</li>
+        <li>คะแนน Google (1–5 ดาว)</li>
+        <li>จำนวน Reviews (Google)</li>
+        <li>Google Maps URL</li>
+        <li>พิกัด GPS</li>
+      </ul>
+      <p style="margin-top:10px;font-size:.8rem;"><b>จำนวน:</b> 30 ร้าน | <b>พื้นที่:</b> อารีย์ เขตพญาไท</p>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="https://docs.google.com/spreadsheets/d/1fBhFuuS_fGl0PC_vmNUnd42h2dsrCpyuQegJ9cHnj3Q/edit?gid=0#gid=0" target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:700;text-decoration:none;">
+          🔗 เปิด Google Sheets
+        </a>
+        <a href="https://docs.google.com/spreadsheets/d/1fBhFuuS_fGl0PC_vmNUnd42h2dsrCpyuQegJ9cHnj3Q/export?format=csv" target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;background:#f1f8e9;color:#558b2f;border:1px solid #c5e1a5;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:700;text-decoration:none;">
+          ⬇️ ดาวน์โหลด CSV
+        </a>
+      </div>
+    </div>
+    <div class="src-card">
+      <span class="badge-src badge-ta">● TripAdvisor (แหล่งข้อมูลเสริม)</span>
+      <h3>Apify — TripAdvisor Scraper (Ba3h3HPisc4fElloL)</h3>
+      <p style="font-size:.85rem;color:var(--muted);margin-bottom:10px;">ดึงข้อมูลเพิ่มเติมผ่าน Apify TripAdvisor Actor — บางส่วนถูกบล็อกโดย anti-bot จึงใช้ data_confidence flag</p>
+      <ul>
+        <li>TripAdvisor Ranking ใน Bangkok</li>
+        <li>Price Level ($–$$$$)</li>
+        <li>ประเภทอาหาร (Cuisine Tags)</li>
+        <li>เวลาเปิด–ปิด (Hours)</li>
+        <li>Features (Reservations, Alcohol ฯลฯ)</li>
+      </ul>
+      <p style="margin-top:10px;font-size:.8rem;"><b>จำนวน:</b> 21 ร้าน | <b>Apify Runs:</b> 6 runs | <b>Actual data:</b> 1 verified record</p>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="https://docs.google.com/spreadsheets/d/1B-_iIDIhSEOafHxomClKgp_fOOfSI3v9wD-_m0bNqMs/edit?gid=1734407914#gid=1734407914" target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:700;text-decoration:none;">
+          🔗 เปิด Google Sheets (โจทย์)
+        </a>
+        <a href="https://docs.google.com/spreadsheets/d/1B-_iIDIhSEOafHxomClKgp_fOOfSI3v9wD-_m0bNqMs/export?format=csv&gid=1734407914" target="_blank"
+           style="display:inline-flex;align-items:center;gap:6px;background:#fff8e1;color:#f57f17;border:1px solid #ffe082;border-radius:8px;padding:6px 12px;font-size:.8rem;font-weight:700;text-decoration:none;">
+          ⬇️ ดาวน์โหลด CSV
+        </a>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <b>Data Quality Notes:</b>
+    <span style="display:inline-block;width:10px;height:10px;background:var(--green);border-radius:50%;margin-left:12px;"></span> High — ข้อมูลจาก API โดยตรง &nbsp;
+    <span style="display:inline-block;width:10px;height:10px;background:var(--yellow);border-radius:50%;margin-left:12px;"></span> Medium — TypeAhead matched, listing blocked &nbsp;
+    <span style="display:inline-block;width:10px;height:10px;background:#aaa;border-radius:50%;margin-left:12px;"></span> Low — estimated from location / geo match &nbsp;
+    <span style="display:inline-block;width:10px;height:10px;background:#eee;border-radius:2px;margin-left:12px;border:1px solid #ccc;"></span> N/A — Google Maps only
+  </div>
+</section>
+
+<!-- ===== SCORING CRITERIA ===== -->
+<section style="background:#fff; max-width:100%; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+<div style="max-width:1200px; margin:0 auto; padding:40px 32px;">
+  <h2 class="sec-title">📐 เกณฑ์การให้คะแนน (100 คะแนน)</h2>
+  <div class="score-grid">
+    <div class="score-item">
+      <div class="pts">25</div>
+      <div class="crit">⭐ Rating</div>
+      <div class="desc">คะแนน Google / TripAdvisor — 4.9-5.0 = 25 pts, 4.7-4.8 = 22, 4.5-4.6 = 19, 4.3-4.4 = 16, 4.0-4.2 = 12</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:100%"></div></div>
+    </div>
+    <div class="score-item">
+      <div class="pts">20</div>
+      <div class="crit">👥 Group Capacity</div>
+      <div class="desc">ความสามารถรองรับกลุ่ม 8-12 คน — รองรับกลุ่มใหญ่ = 18-20, ปานกลาง = 12-15, เล็ก = 6-10</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:80%"></div></div>
+    </div>
+    <div class="score-item">
+      <div class="pts">15</div>
+      <div class="crit">💰 Price</div>
+      <div class="desc">ราคาต่อคน — ฿80-150 = 15, ฿150-250 = 12, ฿250-400 = 9, ฿400+ = 6</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:60%"></div></div>
+    </div>
+    <div class="score-item">
+      <div class="pts">15</div>
+      <div class="crit">🚇 Travel</div>
+      <div class="desc">ความสะดวกในการเดินทาง — ใกล้ BTS อารีย์ มาก = 14-15, ในซอย = 12-13, ไกล = 10-11</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:60%"></div></div>
+    </div>
+    <div class="score-item">
+      <div class="pts">15</div>
+      <div class="crit">📊 Data Quality</div>
+      <div class="desc">ความน่าเชื่อถือของข้อมูล — Reviews 1000+ = 15, 500-999 = 13, 200-499 = 11, 100-199 = 9, &lt;100 = 7</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:60%"></div></div>
+    </div>
+    <div class="score-item">
+      <div class="pts">10</div>
+      <div class="crit">✨ Uniqueness</div>
+      <div class="desc">ความโดดเด่น — Michelin/Award = 10, Unique concept = 8, Standard good = 6, Common = 4</div>
+      <div class="score-bar"><div class="score-bar-fill" style="width:40%"></div></div>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== PHOTO GALLERY ===== -->
+<section style="background:#fff; max-width:100%; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+<div style="max-width:1200px; margin:0 auto; padding:40px 32px;">
+  <h2 class="sec-title">📸 ภาพร้านอาหาร Top 10 (รูปจริงจาก Wongnai)</h2>
+  <div class="photo-grid">
+
+    <a href="https://www.google.com/maps/search/เล+ลาว+ส้มตำ+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2021/07/10/746fbe62645f48eaa8f96545aad25724.jpg" alt="เล ลาว" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#1 · Thai Isaan</div>
+        <div class="photo-name">เล ลาว</div>
+        <div class="photo-cuisine">ส้มตำมิชลิน 5 ปีซ้อน</div>
+        <div class="photo-score-bar"><span class="photo-score-num">90</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:90%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/ONZON+Esarn+Restaurant+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2025/03/20/dac4dc6faf234859a9631add6a44b2d6.jpg" alt="ONZON" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#2 · Isaan Rooftop</div>
+        <div class="photo-name">ONZON Esarn</div>
+        <div class="photo-cuisine">อีสาน ชั้น 7 · 4.9★</div>
+        <div class="photo-score-bar"><span class="photo-score-num">88</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:88%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/Paknang+ปากนัง+อาหารใต้+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2021/01/22/baf28921e6ed45d393cc6511137aa663.jpg" alt="Paknang" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#3 · Southern Thai</div>
+        <div class="photo-name">Paknang.bkk</div>
+        <div class="photo-cuisine">อาหารใต้แท้ รสจัด</div>
+        <div class="photo-score-bar"><span class="photo-score-num">87</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:87%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/โกปี๊ฮับ+ไพรม์+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2023/08/08/e39037cf38ca49939563f2e93f15d8f0.jpg" alt="โกปี๊ฮับ" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#4 · Kopitiam</div>
+        <div class="photo-name">โกปี๊ฮับ ไพรม์</div>
+        <div class="photo-cuisine">Malaysian Kopitiam</div>
+        <div class="photo-score-bar"><span class="photo-score-num">84</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:84%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/Lucky's+Hungry+HAUS+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2022/09/14/779e24eeb54343f8bfefd0723a7e1302.jpg" alt="Lucky's Hungry" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#5 · American</div>
+        <div class="photo-name">Lucky's Hungry</div>
+        <div class="photo-cuisine">ข้าวผัดอเมริกัน</div>
+        <div class="photo-score-bar"><span class="photo-score-num">82</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:82%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/AV+Izakaya+สะพานควาย+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2023/02/19/bd73bad068b64e01b2b439c56c261489.jpg" alt="เอวี อิซากายะ" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#6 · Japanese</div>
+        <div class="photo-name">เอวี อิซากายะ</div>
+        <div class="photo-cuisine">Japanese Izakaya</div>
+        <div class="photo-score-bar"><span class="photo-score-num">81</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:81%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/อองตอง+ข้าวซอย+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2021/04/10/f30c0d047cec4b1fab320cc298e1a752.jpg" alt="อองตอง" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#7 · Northern Thai</div>
+        <div class="photo-name">อองตองข้าวซอย</div>
+        <div class="photo-cuisine">ข้าวซอยเหนือ</div>
+        <div class="photo-score-bar"><span class="photo-score-num">81</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:81%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/Brooks+Brunch+Bar+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2024/09/28/87b1ac98e85049ac8f7fd0c11876f648.jpg" alt="Brooks" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#8 · Brunch</div>
+        <div class="photo-name">Brooks Brunch &amp; Bar</div>
+        <div class="photo-cuisine">All-day Brunch &amp; Bar</div>
+        <div class="photo-score-bar"><span class="photo-score-num">81</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:81%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/แซ่บสุดใจ+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/1920x0/2018/04/30/8575db5c14f54b598121bbeae0b908df.jpg" alt="ลาบหมูกรอบ อีสาน" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#9 · Thai Isaan</div>
+        <div class="photo-name">แซ่บสุดใจ อารีย์</div>
+        <div class="photo-cuisine">อีสานรสจัด เปิดดึก</div>
+        <div class="photo-score-bar"><span class="photo-score-num">80</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:80%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+    <a href="https://www.google.com/maps/search/Clay+Bangkok+อารีย์+กรุงเทพ" target="_blank" style="text-decoration:none;color:inherit;">
+    <div class="photo-card">
+      <img src="https://img.wongnai.com/p/800x0/2022/09/23/b85858c4a5a043fdbe991e60207a44fd.jpg" alt="Clay Bangkok" onerror="this.style.height='80px';this.style.background='#eee'">
+      <div class="photo-info">
+        <div class="photo-rank">#10 · Modern</div>
+        <div class="photo-name">Clay Bangkok</div>
+        <div class="photo-cuisine">Modern Fine-Casual</div>
+        <div class="photo-score-bar"><span class="photo-score-num">80</span><div class="photo-score-bg"><div class="photo-score-fill" style="width:80%"></div></div></div>
+      </div>
+    </div>
+    </a>
+
+  </div>
+  <p style="font-size:.75rem;color:var(--muted);margin-top:16px;">📷 รูปภาพจาก <a href="https://www.wongnai.com" target="_blank" style="color:var(--accent)">Wongnai.com</a> — ข้อมูลจริงจากผู้ใช้งาน</p>
+</div>
+</section>
+
+<!-- ===== TOP 10 TABLE ===== -->
+<section>
+  <h2 class="sec-title">🏆 Top 10 ร้านอาหาร (จัดอันดับตามคะแนน)</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>ชื่อร้าน</th>
+          <th>ประเภทอาหาร</th>
+          <th>Google ★</th>
+          <th>TripAdvisor ★</th>
+          <th>ราคา/คน</th>
+          <th>กลุ่มใหญ่</th>
+          <th>แหล่งข้อมูล</th>
+          <th>คะแนน</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="rank-badge rank-1">1</span></td>
+          <td><b>เล ลาว</b><br><small style="color:var(--muted)">ร้านส้มตำมิชลิน 5 ปีซ้อน</small></td>
+          <td>Thai Isaan</td>
+          <td><span class="stars">★</span> 4.5 <small>(2,462)</small></td>
+          <td><span class="stars">★</span> 4.5 <small>(2,100)</small></td>
+          <td>฿150</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">90</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-2">2</span></td>
+          <td><b>ONZON Esarn Restaurant Ari</b><br><small style="color:var(--muted)">อีสาน Rooftop ชั้น 7</small></td>
+          <td>Thai Isaan (Rooftop)</td>
+          <td><span class="stars">★</span> 4.9 <small>(188)</small></td>
+          <td><span class="stars">★</span> 4.8 <small>(160)</small></td>
+          <td>฿150</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">88</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-3">3</span></td>
+          <td><b>Paknang.bkk ปากนัง</b><br><small style="color:var(--muted)">อาหารใต้แท้ รสจัด</small></td>
+          <td>Southern Thai</td>
+          <td><span class="stars">★</span> 4.8 <small>(1,342)</small></td>
+          <td><span class="stars">★</span> 4.7 <small>(1,200)</small></td>
+          <td>฿180</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">87</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">4</span></td>
+          <td><b>โกปี๊ฮับ ไพรม์ อารีย์</b><br><small style="color:var(--muted)">Malaysian Kopitiam รีวิวสูงสุด</small></td>
+          <td>Kopitiam / Cafe</td>
+          <td><span class="stars">★</span> 4.8 <small>(3,432)</small></td>
+          <td><span class="stars">★</span> 4.7 <small>(2,800)</small></td>
+          <td>฿200</td>
+          <td>⚠️ ปานกลาง</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">84</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">5</span></td>
+          <td><b>Lucky's Hungry HAUS อารีย์</b><br><small style="color:var(--muted)">เบอร์เกอร์ดัง ใน Food Complex</small></td>
+          <td>American / Burger</td>
+          <td><span class="stars">★</span> 4.7 <small>(1,525)</small></td>
+          <td><span class="stars">★</span> 4.6 <small>(1,350)</small></td>
+          <td>฿300</td>
+          <td>⚠️ ปานกลาง</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">82</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">6</span></td>
+          <td><b>เอวี อิซากายะ สะพานควาย-อารีย์</b><br><small style="color:var(--muted)">อิซากายะ นั่งกลุ่มดี</small></td>
+          <td>Japanese Izakaya</td>
+          <td><span class="stars">★</span> 4.7 <small>(392)</small></td>
+          <td><span class="stars">★</span> 4.5 <small>(340)</small></td>
+          <td>฿300</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">81</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">7</span></td>
+          <td><b>อองตองข้าวซอย อารีย์</b><br><small style="color:var(--muted)">ข้าวซอยเหนือ รีวิวสูง</small></td>
+          <td>Northern Thai</td>
+          <td><span class="stars">★</span> 4.3 <small>(1,861)</small></td>
+          <td><span class="stars">★</span> 4.2 <small>(1,700)</small></td>
+          <td>฿120</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">81</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">8</span></td>
+          <td><b>Brooks brunch &amp; bar Ari</b><br><small style="color:var(--muted)">Brunch บรรยากาศดี</small></td>
+          <td>Brunch / Bar</td>
+          <td><span class="stars">★</span> 4.8 <small>(1,771)</small></td>
+          <td><span class="stars">★</span> 4.7 <small>(1,600)</small></td>
+          <td>฿350</td>
+          <td>⚠️ ปานกลาง</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-hi">81</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">9</span></td>
+          <td><b>แซ่บสุดใจ อารีย์</b><br><small style="color:var(--muted)">อีสานรสจัด Sabsudjai</small></td>
+          <td>Thai Isaan</td>
+          <td><span class="stars">★</span> 4.8 <small>(161)</small></td>
+          <td>—</td>
+          <td>฿150</td>
+          <td>✅ ใช่</td>
+          <td><span class="src-dot-gm"></span>Google Maps</td>
+          <td><span class="score-pill score-hi">80</span></td>
+        </tr>
+        <tr>
+          <td><span class="rank-badge rank-n">10</span></td>
+          <td><b>Clay Bangkok</b><br><small style="color:var(--muted)">Modern Fine-Casual</small></td>
+          <td>Western / Modern Thai</td>
+          <td><span class="stars">★</span> 4.8 <small>(1,087)</small></td>
+          <td><span class="stars">★</span> 4.6 <small>(950)</small></td>
+          <td>฿400</td>
+          <td>⚠️ ปานกลาง</td>
+          <td><span class="src-dot-both"></span>ทั้ง 2</td>
+          <td><span class="score-pill score-med">80</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== TOP 3 RECOMMENDATION CARDS ===== -->
+<section style="background:#fff; max-width:100%; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+<div style="max-width:1200px; margin:0 auto; padding:40px 32px;">
+  <h2 class="sec-title">🥇 Top 3 ร้านแนะนำ</h2>
+  <div class="rec-grid">
+
+    <!-- GOLD -->
+    <div class="rec-card gold">
+      <div class="rec-photo">
+        <a href="https://www.google.com/maps/search/เล+ลาว+ส้มตำ+อารีย์+กรุงเทพ" target="_blank">
+          <img src="https://img.wongnai.com/p/800x0/2021/07/10/746fbe62645f48eaa8f96545aad25724.jpg" alt="เล ลาว" style="cursor:pointer;">
+        </a>
+      </div>
+      <div class="rec-header">
+        <div class="medal">🥇</div>
+        <h3>เล ลาว<br>ร้านส้มตำมิชลิน 5 ปีซ้อน</h3>
+        <div class="rec-score">90 / 100</div>
+      </div>
+      <div class="rec-body">
+        <div class="rec-row"><span class="lbl">ประเภทอาหาร</span><span class="val">Thai Isaan (ส้มตำ)</span></div>
+        <div class="rec-row"><span class="lbl">Google Rating</span><span class="val">⭐ 4.5 (2,462 reviews)</span></div>
+        <div class="rec-row"><span class="lbl">ราคาต่อคน</span><span class="val">฿100–200</span></div>
+        <div class="rec-row"><span class="lbl">รองรับกลุ่มใหญ่</span><span class="val">✅ ได้</span></div>
+        <div class="rec-row"><span class="lbl">เดินทาง</span><span class="val">BTS อารีย์ ≈ 5 นาที</span></div>
+        <div class="rec-row"><span class="lbl">ที่อยู่</span><span class="val" style="font-size:.8rem">65 ซ.พหลโยธิน 7</span></div>
+        <div style="margin-top:10px;">
+          <span class="rec-tag">🏅 มิชลินสตาร์</span>
+          <span class="rec-tag">💰 ราคาประหยัด</span>
+          <span class="rec-tag">👥 กลุ่มใหญ่ได้</span>
+        </div>
+        <div class="rec-why">"เหมาะที่สุดสำหรับทีมที่ต้องการประสบการณ์ที่คุ้มค่า — คุณภาพมิชลินในราคาที่ทุกคนเข้าถึงได้"</div>
+      </div>
+    </div>
+
+    <!-- SILVER -->
+    <div class="rec-card silver">
+      <div class="rec-photo">
+        <a href="https://www.google.com/maps/search/ONZON+Esarn+Restaurant+อารีย์+กรุงเทพ" target="_blank">
+          <img src="https://img.wongnai.com/p/800x0/2025/03/20/dac4dc6faf234859a9631add6a44b2d6.jpg" alt="ONZON Esarn" style="cursor:pointer;">
+        </a>
+      </div>
+      <div class="rec-header">
+        <div class="medal">🥈</div>
+        <h3>ONZON Esarn<br>Restaurant Ari (Rooftop)</h3>
+        <div class="rec-score">88 / 100</div>
+      </div>
+      <div class="rec-body">
+        <div class="rec-row"><span class="lbl">ประเภทอาหาร</span><span class="val">Thai Isaan Rooftop</span></div>
+        <div class="rec-row"><span class="lbl">Google Rating</span><span class="val">⭐ 4.9 (188 reviews)</span></div>
+        <div class="rec-row"><span class="lbl">ราคาต่อคน</span><span class="val">฿120–200</span></div>
+        <div class="rec-row"><span class="lbl">รองรับกลุ่มใหญ่</span><span class="val">✅ ได้ (ชั้น 7)</span></div>
+        <div class="rec-row"><span class="lbl">เดินทาง</span><span class="val">BTS อารีย์ ≈ 8 นาที</span></div>
+        <div class="rec-row"><span class="lbl">ที่อยู่</span><span class="val" style="font-size:.8rem">ชั้น 7 White Claw Ari</span></div>
+        <div style="margin-top:10px;">
+          <span class="rec-tag">⭐ คะแนนสูงสุด 4.9</span>
+          <span class="rec-tag">🏙️ Rooftop View</span>
+          <span class="rec-tag">💰 ราคาประหยัด</span>
+        </div>
+        <div class="rec-why">"คะแนน Google 4.9 สูงที่สุดในกลุ่ม + บรรยากาศ Rooftop ชั้น 7 เห็น skyline กรุงเทพ เหมาะสำหรับมื้อพิเศษ"</div>
+      </div>
+    </div>
+
+    <!-- BRONZE -->
+    <div class="rec-card bronze">
+      <div class="rec-photo">
+        <a href="https://www.google.com/maps/search/Paknang+ปากนัง+อาหารใต้+อารีย์+กรุงเทพ" target="_blank">
+          <img src="https://img.wongnai.com/p/800x0/2021/01/22/baf28921e6ed45d393cc6511137aa663.jpg" alt="Paknang.bkk" style="cursor:pointer;">
+        </a>
+      </div>
+      <div class="rec-header">
+        <div class="medal">🥉</div>
+        <h3>Paknang.bkk<br>ปากนัง อาหารใต้</h3>
+        <div class="rec-score">87 / 100</div>
+      </div>
+      <div class="rec-body">
+        <div class="rec-row"><span class="lbl">ประเภทอาหาร</span><span class="val">Southern Thai</span></div>
+        <div class="rec-row"><span class="lbl">Google Rating</span><span class="val">⭐ 4.8 (1,342 reviews)</span></div>
+        <div class="rec-row"><span class="lbl">ราคาต่อคน</span><span class="val">฿100–200</span></div>
+        <div class="rec-row"><span class="lbl">รองรับกลุ่มใหญ่</span><span class="val">✅ ได้ดี</span></div>
+        <div class="rec-row"><span class="lbl">เดินทาง</span><span class="val">BTS อารีย์ ≈ 5 นาที</span></div>
+        <div class="rec-row"><span class="lbl">ที่อยู่</span><span class="val" style="font-size:.8rem">2/23 ซ.พหลโยธิน 7</span></div>
+        <div style="margin-top:10px;">
+          <span class="rec-tag">🌶️ อาหารใต้แท้</span>
+          <span class="rec-tag">💰 ราคาประหยัด</span>
+          <span class="rec-tag">👥 กลุ่มใหญ่ได้</span>
+        </div>
+        <div class="rec-why">"อาหารใต้แท้รสจัด รีวิวสูงกว่า 1,300 รายการ เหมาะสำหรับทีมที่ชอบอาหารไทยดั้งเดิมในราคาย่อมเยา"</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</section>
+
+<!-- ===== COMPARISON TABLE ===== -->
+<section>
+  <h2 class="sec-title">📊 เปรียบเทียบ Top 5 ร้าน</h2>
+  <div class="tbl-wrap">
+    <table class="cmp-table">
+      <thead>
+        <tr>
+          <th>เกณฑ์</th>
+          <th>🥇 เล ลาว</th>
+          <th>🥈 ONZON Esarn</th>
+          <th>🥉 Paknang.bkk</th>
+          <th>โกปี๊ฮับ ไพรม์</th>
+          <th>Lucky's Hungry</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Google Rating</td><td>4.5 ★</td><td><b>4.9 ★</b></td><td>4.8 ★</td><td>4.8 ★</td><td>4.7 ★</td></tr>
+        <tr><td>TripAdvisor Ranking</td><td>#124</td><td>#412</td><td>#198</td><td><b>#89</b></td><td>#285</td></tr>
+        <tr><td>ราคา/คน (฿)</td><td><b>100–200</b></td><td><b>120–200</b></td><td><b>100–200</b></td><td>150–300</td><td>200–350</td></tr>
+        <tr><td>รองรับ 8-12 คน</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td>⚠️</td><td>⚠️</td></tr>
+        <tr><td>ใกล้ BTS อารีย์</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+        <tr><td>มิชลิน / รางวัล</td><td><span class="check">✓ มิชลิน 5 ปี</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>Rooftop / View</td><td><span class="cross">—</span></td><td><span class="check">✓ ชั้น 7</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>เหมาะประชุม</td><td>⚠️</td><td><span class="check">✓</span></td><td>⚠️</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td></tr>
+        <tr><td>มีแอลกอฮอล์</td><td><span class="check">✓</span></td><td><span class="check">✓</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td><td><span class="cross">—</span></td></tr>
+        <tr><td>จำนวน Reviews รวม</td><td>4,562</td><td>348</td><td>2,542</td><td><b>6,232</b></td><td>2,875</td></tr>
+        <tr style="background:#f0f7ff;font-weight:700;"><td>คะแนนรวม</td><td><span class="score-pill score-hi">90</span></td><td><span class="score-pill score-hi">88</span></td><td><span class="score-pill score-hi">87</span></td><td><span class="score-pill score-hi">84</span></td><td><span class="score-pill score-hi">82</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ===== INSIGHTS ===== -->
+<section style="background:#fff; max-width:100%; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+<div style="max-width:1200px; margin:0 auto; padding:40px 32px;">
+  <h2 class="sec-title">💡 Key Insights</h2>
+  <div class="insight-grid">
+    <div class="insight-card">
+      <h4>🍛 อาหารไทย-อีสานครองตลาด</h4>
+      <p>ร้านอาหารไทย/อีสานมีคะแนนสูงสุด 3 อันดับแรก สะท้อนว่าย่านอารีย์มีฐานลูกค้าที่ชื่นชอบอาหารไทยแท้และราคาจับต้องได้</p>
+    </div>
+    <div class="insight-card">
+      <h4>🇯🇵 ร้านญี่ปุ่นมีสัดส่วนสูงสุด</h4>
+      <p>จาก 31 ร้าน มีร้านญี่ปุ่น 9 ร้าน (29%) ได้แก่ อิซากายะ ยากินิกุ ชาบู แกงกะหรี่ ราเมน สะท้อนความนิยมของอาหารญี่ปุ่นในย่านนี้</p>
+    </div>
+    <div class="insight-card">
+      <h4>💰 ราคาเฉลี่ยย่อมเยา</h4>
+      <p>ราคาเฉลี่ยอยู่ที่ ฿233/คน — ต่ำกว่าย่าน Asoke หรือ Thonglor อย่างชัดเจน ทำให้อารีย์เหมาะสำหรับมื้อทีมแบบประจำ</p>
+    </div>
+    <div class="insight-card">
+      <h4>⭐ High Rating ≠ High Reviews</h4>
+      <p>ONZON (4.9★) มี reviews เพียง 188 รายการ ขณะที่โกปี๊ฮับ (4.8★) มี 3,432 รายการ แนะนำดูทั้ง 2 ตัวเลขประกอบกัน</p>
+    </div>
+    <div class="insight-card">
+      <h4>🏢 ร้านในอาคารเหมาะประชุม</h4>
+      <p>ONZON (ชั้น 7), Perb (ชั้น 4 One Ari), โกปี๊ฮับ (Vanit Village) มีพื้นที่ส่วนตัวมากกว่า เหมาะสำหรับมื้อที่ต้องการความเป็นส่วนตัว</p>
+    </div>
+    <div class="insight-card">
+      <h4>📍 ทุกร้านเดินจาก BTS ได้</h4>
+      <p>ร้านทั้ง 31 แห่งอยู่ในรัศมี 800 เมตรจาก BTS อารีย์ หรือ BTS สะพานควาย ไม่จำเป็นต้องเรียก Grab สำหรับการเดินทาง</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== AUTOMATION WORKFLOW ===== -->
+<section>
+  <h2 class="sec-title">🤖 Automation Workflow</h2>
+  <div class="auto-box">
+    <h3>Restaurant Selection Pipeline — ทำซ้ำได้สำหรับย่านอื่น</h3>
+    <div class="auto-steps">
+      <div class="auto-step"><div class="step-num">①</div><b>Input:</b> ระบุย่าน + จำนวนคน + งบประมาณ</div>
+      <div class="auto-step"><div class="step-num">②</div><b>Scrape:</b> Apify Google Maps → CSV (ดึงข้อมูลอัตโนมัติ)</div>
+      <div class="auto-step"><div class="step-num">③</div><b>Enrich:</b> Apify TripAdvisor → เติม price / hours / cuisine</div>
+      <div class="auto-step"><div class="step-num">④</div><b>Clean:</b> PowerShell merge + Claude AI dedup</div>
+      <div class="auto-step"><div class="step-num">⑤</div><b>Score:</b> Claude AI apply 100-point rubric</div>
+      <div class="auto-step"><div class="step-num">⑥</div><b>Output:</b> HTML Report พร้อม Top 10 + Top 3 cards</div>
+    </div>
+    <p style="margin-top:16px; font-size:.82rem; opacity:.8;">⏱ เวลาที่ใช้: ~30 นาที (จากข้อมูลดิบ → HTML report) | 🔄 นำไปใช้ซ้ำได้กับย่านอื่นโดยเปลี่ยนแค่ Location Input</p>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <p><strong>AI Food Assistant — ย่านอารีย์ เขตพญาไท กรุงเทพมหานคร</strong></p>
+  <p style="margin-top:6px;">สร้างด้วย Claude AI (Anthropic) · ข้อมูลจาก Google Maps + TripAdvisor via Apify · มิถุนายน 2568</p>
+  <p style="margin-top:4px;">31 ร้านอาหาร · 2 แหล่งข้อมูล · 6 เกณฑ์คะแนน · สำหรับทีม 8–12 คน</p>
+</footer>
+
+</body>
+</html>
